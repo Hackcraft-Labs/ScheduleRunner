@@ -17,12 +17,14 @@ namespace ScheduleRunner
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern int Wow64DisableWow64FsRedirection(ref IntPtr ptr);
 
-        public TaskManager(String method, String taskName, String folder, String author, String description, String trigger, String program, String argument, String user, String modifier, String startTime, String remoteServer, bool hide) {
+        public TaskManager(String method, String taskName, String folder, String author, String description, String trigger, String program, String argument, string oldAction, string order, String user, String modifier, String startTime, String remoteServer, bool hide) {
             Helper.Banner();
             try
             {
                 if (method.ToLower().Equals("create"))
                     CreateScheduledTask(taskName, folder, author, description, trigger, program, argument, user, modifier, startTime, remoteServer, hide);
+                else if (method.ToLower().Equals("edit"))
+                    EditScheduledTask(taskName, folder, program, argument, oldAction, order, trigger, startTime, user, remoteServer, null, hide);
                 else if (method.ToLower().Equals("delete"))
                     RemoveScheduledTask(taskName, folder, remoteServer, null, hide);
                 else if (method.ToLower().Equals("run"))
@@ -454,6 +456,201 @@ namespace ScheduleRunner
                 else
                     Console.WriteLine("[-] Error: Error when creating the scheduled task. Please check your parameters again.");
                 return null;
+            }
+        }
+
+        void EditScheduledTask(string taskName, string folder, string program, string argument, string oldAction, string order, string trigger, string startTime, string user, string remoteServer, TaskService ts, bool hide)
+        {
+            try
+            {
+                if (taskName == null || program == null)
+                {
+                    Console.WriteLine("[-] Error: Missing parameters. \"/taskname, /program\" must be defined. Please try again.");
+                    return;
+                }
+
+                if (hide)
+                {
+                    if (remoteServer != null)
+                    {
+                        Console.WriteLine("[-] Error: Technique (hiding scheduled task) does not support remote server since 'Remote Registry' service is ran by Local Service only.");
+                        return;
+                    }
+                    else if (!CheckIsSystem())
+                    {
+                        Console.WriteLine("[-] Error: Using technique (hiding scheduled task) requires NT AUTHORITY\\SYSTEM.");
+                        return;
+                    }
+                }
+
+                if (ts == null)
+                {
+                    if (remoteServer != null)
+                    {
+                        ts = GetRemoteTaskService(remoteServer);
+                        if (ts == null)
+                            return;
+                    }
+                    else
+                        ts = new TaskService();
+                }
+
+                if (folder != null)
+                {
+                    bool folderIsExist;
+                    if (folder.EndsWith("\\"))
+                    {
+                        folderIsExist = CheckIfFolderExists(ts, folder.Remove(folder.Length - 1));
+                    }
+                    else
+                    {
+                        folderIsExist = CheckIfFolderExists(ts, folder);
+                        folder = folder + "\\";
+                    }
+                    if (!folderIsExist)
+                    {
+                        Console.WriteLine("[-] Error: The folder does not exist.");
+                        return;
+                    }
+                    taskName = folder + taskName;
+                }
+
+                if (CheckIfScheduledTaskExists(ts, taskName))
+                {
+                    Task task = ts.GetTask(taskName);
+                    TaskDefinition td = task.Definition;
+                    if (order != null)
+                    {
+                        int actions = td.Actions.Count();
+                        if (!int.TryParse(order, out int index))
+                        {
+                            Console.WriteLine($"[-] Error: Invalid order. '{order}' is not a valid integer.");
+                            return;
+                        }
+                        if (index < 1 || index > (actions + 1))
+                        {
+                            Console.WriteLine($"[-] Error: Invalid order. Please enter a value between 1 and {actions + 1}.");
+                            return;
+                        }
+                    }
+                    if (trigger != null)
+                    {
+                        if (trigger.Equals("daily"))
+                        {
+                            if (startTime == null)
+                            {
+                                Console.WriteLine("[-] Error: The \"/starttime\" must be defined when daily trigger is used. Please try again. For example, \"/starttime:23:30\" to repeat the task daily at 11:30pm.");
+                                return;
+                            }
+                            try
+                            {
+                                int hour = Int16.Parse(startTime.Split(':')[0]);
+                                int minute = Int16.Parse(startTime.Split(':')[1]);
+                                DailyTrigger dt = new DailyTrigger();
+                                dt.StartBoundary = DateTime.Today + TimeSpan.FromHours(hour) + TimeSpan.FromMinutes(minute);
+                                dt.DaysInterval = 1;
+                                td.Triggers.Add(dt);
+                            }
+                            catch (FormatException)
+                            {
+                                Console.WriteLine("[-] Error: Wrong time format for \"/starttime:\". Please try again. For example, use \"/starttime:23:30\" to repeat the task daily at 11:30pm.");
+                                return;
+                            }
+                        }
+                        else if (trigger.Equals("onlogon"))
+                        {
+                            foreach (LogonTrigger logonTrigger in td.Triggers.OfType<LogonTrigger>())
+                            {
+                                string[] array = logonTrigger.UserId.Split('\\');
+                                string userOnTrigger = (array.Length > 1) ? array[1] : array[0];
+                                if (user != null && userOnTrigger.Equals(user))
+                                {
+                                    Console.WriteLine("[-] Error: The \"onlogon\" trigger already exists for the specified user. Please try again.");
+                                    return;
+                                }
+                                else if (user == null && userOnTrigger.Equals(td.Principal.UserId))
+                                {
+                                    Console.WriteLine($"[-] Error: The \"onlogon\" trigger already exists for the {td.Principal.UserId} user. Please try again.");
+                                    return;
+                                }
+                            }
+                            LogonTrigger lt = new LogonTrigger();
+                            lt.UserId = user ?? td.Principal.UserId;
+                            td.Triggers.Add(lt);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[-] Error: Only \"daily\" and \"onlogon\" triggers when editing a task. Please try again.");
+                            return;
+                        }
+                    }
+                    if (order == null)
+                    {
+                        if (oldAction == null)
+                        {
+                            int execActions = td.Actions.OfType<ExecAction>().Count();
+                            if (execActions > 1)
+                            {
+                                Console.WriteLine("[-] Error: The task has more than one exec actions. Please specify which one you would like to replace using  \"/oldaction\" parameter.");
+                                return;
+                            }
+                            foreach (Microsoft.Win32.TaskScheduler.Action action in td.Actions)
+                            {
+                                if (action is ExecAction execAction)
+                                {
+                                    execAction.Path = program;
+                                    execAction.Arguments = argument;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            foreach (Microsoft.Win32.TaskScheduler.Action action in td.Actions)
+                            {
+                                if (action is ExecAction execAction && execAction.Path.Equals(oldAction, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    execAction.Path = program;
+                                    execAction.Arguments = argument;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int.TryParse(order, out int index);
+                        int insertIndex = index - 1;
+                        ExecAction newAction = new ExecAction(program, argument, null);
+                        td.Actions.Insert(insertIndex, newAction);
+                    }
+                    ts.RootFolder.RegisterTaskDefinition(task.Name, td);
+                    if (hide)
+                    {
+                        if (CheckIsHiddenScheduledTask(taskName))
+                            HideScheduledTask(taskName);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[-] Error: The scheduled task does not exist.");
+                }
+            }
+            catch (Exception e)
+            {
+                if (e is UnauthorizedAccessException)
+                    Console.WriteLine("[-] Error: You do not have sufficient permission to edit the scheduled task.");
+                else if (e is COMException)
+                {
+                    if (e.HResult.ToString("x") == "800706b5")
+                        Console.WriteLine("[-] Error: The interface is unknown. Probably the Schedule service is down?");
+                    else if (e.HResult.ToString("x") == "80070534")
+                        Console.WriteLine("[-] Error: The user name could not be found.");
+                    else
+                        Console.WriteLine("[-] Error: " + e.Message);
+                }
+                else
+                    Console.WriteLine("[-] Error: Error when editing the scheduled task. Please check your parameters again.");
             }
         }
 

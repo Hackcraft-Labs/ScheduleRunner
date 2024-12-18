@@ -16,6 +16,8 @@ namespace ScheduleRunner
         private static string modifier = null;
         private static string startTime = null;
         private static string remoteServer = null;
+        private static string oldAction = null;
+        private static string order = null;
         private static bool hide = false;
 
         static void Main(string[] args) {
@@ -45,6 +47,10 @@ namespace ScheduleRunner
                     program = argsParam["program"];
                 if (argsParam.ContainsKey("argument"))
                     agrument = argsParam["argument"];
+                if (argsParam.ContainsKey("oldaction"))
+                    oldAction = argsParam["oldaction"];
+                if (argsParam.ContainsKey("order"))
+                    order = argsParam["order"];
                 if (argsParam.ContainsKey("user"))
                     user = argsParam["user"];
                 if (argsParam.ContainsKey("modifier"))
@@ -52,7 +58,7 @@ namespace ScheduleRunner
                 if (argsParam.ContainsKey("starttime"))
                     startTime = argsParam["starttime"];
                 if (argsParam.ContainsKey("remoteserver"))
-                    remoteServer = argsParam["remoteserver"];
+                    remoteServer = argsParam["remoteserver"]; 
                 if (argsParam.ContainsKey("technique"))
                 {
                     string technique = argsParam["technique"];
@@ -60,7 +66,7 @@ namespace ScheduleRunner
                         hide = true;
                 }
 
-                new TaskManager(method, taskName, folder, author, description, trigger, program, agrument, user, modifier, startTime, remoteServer, hide);
+                new TaskManager(method, taskName, folder, author, description, trigger, program, agrument, oldAction, order, user, modifier, startTime, remoteServer, hide);
             }
             else
             {

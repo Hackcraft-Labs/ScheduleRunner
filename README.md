@@ -55,6 +55,23 @@ A number of C# tools were already developed to simulate the attack using schedul
 
 [*] are mandatory fields.
 
+## Options for scheduled task editing (/method:edit):
+|  Method | Function  |
+| ------------ | ------------ |
+| [*] /taskname | Specify the name of the scheduled task |
+| [*] /program | Specify the program that the task will run |
+| /argument | Specify the command line argument for the program |
+| /oldaction | Specify the old program that will be replaced with program |
+| /order | Specify the index in actions in which the new program will be added (1-based) |
+| /trigger | Specify the schedule type. The valid values include: "daily", "onlogon" |
+| /starttime | Specify the start time for daily schedule type (e.g., 23:30) |
+| /folder | Specify the folder where the scheduled task stores (default: \\) |
+| /remoteserver | Specify the hostname or IP address of a remote computer |
+| /user | Run the task with a specified user account |
+| /technique | Specify evasion technique:<br>- "hide": A technique used by HAFNIUM malware that will hide the scheduled task from task query<br><br>[!] https://www.microsoft.com/security/blog/2022/04/12/tarrask-malware-uses-scheduled-tasks-for-defense-evasion/<br>[!] This technique does not support remote execution due to privilege of remote registry. It requires "NT AUTHORITY\SYSTEM" and the task will continue to run until system reboot even after task deletion |
+
+[*] are mandatory fields.
+
 ## Options for scheduled task query (/method:query):
 |  Method | Function  |
 | ------------ | ------------ |
@@ -121,6 +138,36 @@ A number of C# tools were already developed to simulate the attack using schedul
 **Delete a scheduled task called "Cleanup" that used hiding scheduled task technique:**
 
 `ScheduleRunner.exe /method:delete /taskname:Cleanup /technique:hide`
+
+**Edit a scheduled task called "test" which has 1 exec action and will be replaced with the program**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe`
+
+**Edit a scheduled task called "test" which has 1 exec action and will be replaced with the program and argument**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /argument:"-m 1"`
+
+**Edit a scheduled task called "test" which has multiple exec actions and one of them(oldaction) will be replaced with the program**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /oldaction:"C:\Windows\notepad.exe"`
+
+**Edit a scheduled task called "test" which has multiple exec actions and one of them(oldaction) will be replaced with the program and argument**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /argument:"-m 1" /oldaction:"C:\Windows\notepad.exe"`
+
+**Edit a scheduled task called "test" by adding a new exec action and specifying the order (1-based) in which it will appear in the action list. In this example, the new exec action will be added first**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /order:1`
+
+**Edit a scheduled task called "test" by adding a new exec action with argument and specifying the order (1-based) in which it will appear in the action list. In this example, the new exec action will be added first**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /argument:"-m 1" /order:1`
+
+**Edit a scheduled task called "test" by adding a new exec action with argument and specifying the order (1-based) in which will appear in the action list and adding a trigger. In this example, the new exec action will be added first and the trigger will be onlogon**
+
+`ScheduleRunner.exe /method:edit /taskname:test /program:calc.exe /argument:"-m 1" /order:1 /trigger:onlogon`
+
+In the edit functionality the CLI arguments "/folder", "/remoteserver", "/user" and "/technique" are used as expected in the other methods too.
 
 ## Hiding Scheduled Task Technique
 This technique was used by threat actor - HAFNIUM and discovered by Microsoft recently. It aims to make the scheduled task unqueriable by tools and unseeable by Task Scheduler.
