@@ -6,13 +6,14 @@ A number of C# tools were already developed to simulate the attack using schedul
 
 ## Screenshot:
 
-![HowTo](https://github.com/netero1010/ScheduleRunner/raw/main/screenshot.png)
+![HowTo](screenshot.png)
 
 ## Methods (/method):
 |  Method | Function  |
 | ------------ | ------------ |
 | create | Create a new scheduled task |
 | delete | Delete an existing scheduled task |
+| edit | Edit an existing scheduled task |
 | run | Execute an existing scheduled task |
 | query | Query details for a scheduled task or all scheduled tasks under a folder |
 | queryfolders | Query all sub-folders in scheduled task  |
